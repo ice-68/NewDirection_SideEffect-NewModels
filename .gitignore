@@ -1,0 +1,33 @@
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# IDE
+.idea/
+.vscode/
+
+# Research data
+data/AAL/
+data/CC200/
+data/CC400/
+
+# Generated cache
+cache/*.npz
+cache/*.json
+cache/*.csv
+
+# Experiment outputs
+runs/
+outputs/
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+
+# OS
+.DS_Store
+Thumbs.db
