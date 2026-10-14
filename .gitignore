@@ -14,7 +14,7 @@ venv/
 data/AAL/
 data/CC200/
 data/CC400/
-
+Papers
 # Generated cache
 cache/*.npz
 cache/*.json
