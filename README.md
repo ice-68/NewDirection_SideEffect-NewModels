@@ -1,1 +1,2 @@
 # NewDirection_SideEffect-NewModels
+# 本项目旨在研究用前沿的时序模型结合图注意力机制并且考虑了站点效应之后对实验准确度的影响。
