@@ -13,10 +13,15 @@ if str(ROOT) not in sys.path:
 
 from src.b1 import (  # noqa: E402
     GCA,
+    INFERENCE_MODE,
+    _load_checkpoint,
+    _save_checkpoint,
+    build_fit_adjacency,
     build_population_adjacency,
     fc_upper_features,
     normalize_adjacency,
     run_loso,
+    score_test_nodes_inductive,
     select_ridge_features,
     set_seed,
     summarize,
@@ -57,6 +62,59 @@ def test_population_adjacency():
     assert np.allclose(np.diag(adjacency), 0.0)
     assert np.allclose(normalized, normalized.T)
     assert (normalized >= 0).all()
+
+
+def test_fit_adjacency_excludes_test_nodes():
+    rng = np.random.default_rng(5)
+    features = rng.normal(size=(8, 4)).astype(np.float32)
+    gender = np.tile(np.array([1, 2]), 4)
+    age = np.arange(8, dtype=np.float32)
+    fit_idx = np.array([0, 1, 2, 3, 4, 5])
+    adjacency = build_fit_adjacency(features, gender, age, fit_idx, sigma=0.5, age_tau=5)
+    assert adjacency.shape == (len(fit_idx), len(fit_idx))
+
+
+def test_inductive_test_scoring_uses_one_test_node_at_a_time():
+    class RecordingModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.shapes = []
+
+        def forward(self, x, adjacency):
+            self.shapes.append((x.shape[0], adjacency.shape[0]))
+            return torch.zeros(x.shape[0])
+
+    features = np.arange(30, dtype=np.float32).reshape(6, 5)
+    gender = np.array([1, 1, 2, 2, 1, 2])
+    age = np.arange(6, dtype=np.float32)
+    model = RecordingModel()
+    scores = score_test_nodes_inductive(
+        model=model,
+        node_features=features,
+        gender=gender,
+        age=age,
+        fit_idx=np.array([0, 1, 2, 3]),
+        test_idx=np.array([4, 5]),
+        sigma=0.5,
+        age_tau=5.0,
+        device="cpu",
+    )
+    assert scores.shape == (2,)
+    assert model.shapes == [(5, 5), (5, 5)]
+
+
+def test_b1_checkpoint_roundtrip(tmp_path):
+    path = tmp_path / "fold.json"
+    config = {"hidden": 8, "fold_signature": "abc"}
+    payload = {
+        "config": config,
+        "predictions": [{"score": 0.5}],
+        "selection": {"best_epoch": 1},
+        "history": [{"epoch": 1}],
+    }
+    _save_checkpoint(path, payload)
+    assert _load_checkpoint(path, config) == payload
+    assert _load_checkpoint(path, {"hidden": 9}) is None
 
 
 def test_gca_forward():
@@ -109,6 +167,8 @@ def test_b1_loso_smoke_and_summary():
     assert len(selections) == 3
     assert len(predictions) == len(labels)
     assert len(histories) == 6
+    assert (selections["inference_mode"] == INFERENCE_MODE).all()
+    assert (selections["n_graph_train_nodes"] == selections["n_fit"]).all()
     assert (predictions["score"] >= 0).all()
     assert (predictions["score"] <= 1).all()
 

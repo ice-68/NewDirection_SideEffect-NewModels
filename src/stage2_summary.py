@@ -9,9 +9,11 @@ from .metrics import binary_metrics, mean_std
 METRIC_NAMES = (
     "accuracy",
     "auc",
+    "pr_auc",
     "sensitivity",
     "specificity",
     "balanced_accuracy",
+    "f1",
     "kappa",
 )
 
@@ -58,17 +60,24 @@ def summarize_predictions(predictions, selections, threshold=0.5):
         site_rows.append(row)
     site_summary = pd.DataFrame(site_rows)
 
+    worst_site_auc_mean, worst_site_auc_std = mean_std(seed_summary["worst_site_auc"])
     summary = {
         "n_predictions": int(len(predictions)),
         "n_folds": int(len(selections)),
         "n_seeds": int(predictions["seed"].nunique()),
         "n_sites": int(predictions["test_site"].nunique()),
-        "worst_site_auc_mean": float(seed_summary["worst_site_auc"].mean()),
-        "worst_site_auc_std": float(seed_summary["worst_site_auc"].std(ddof=1)),
-        "mean_best_epoch": float(selections["best_epoch"].mean()),
-        "mean_epochs_run": float(selections["epochs_run"].mean()),
-        "total_wall_seconds": float(selections["wall_seconds"].sum()),
+        "worst_site_auc_mean": worst_site_auc_mean,
+        "worst_site_auc_std": worst_site_auc_std,
+        "primary_metric": "site_macro_auc",
+        "binary_threshold": float(threshold),
+        "metric_names": list(METRIC_NAMES),
     }
+    for column in ("best_epoch", "epochs_run", "wall_seconds"):
+        if column in selections:
+            if column == "wall_seconds":
+                summary["total_wall_seconds"] = float(selections[column].sum())
+            else:
+                summary[f"mean_{column}"] = float(selections[column].mean())
     for name in METRIC_NAMES:
         value_mean, value_std = mean_std(seed_summary[f"macro_{name}"])
         summary[f"macro_{name}_mean"] = value_mean

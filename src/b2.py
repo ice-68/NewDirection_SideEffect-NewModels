@@ -25,6 +25,7 @@ from torch.utils.data import DataLoader, Subset, TensorDataset
 
 from . import config
 from .preprocess import apply_zscore, fit_zscore
+from .provenance import fold_signature, run_fingerprint
 from .stage2_summary import summarize_predictions
 
 
@@ -36,6 +37,7 @@ DEFAULT_MAX_EPOCHS = 80
 DEFAULT_PATIENCE = 10
 DEFAULT_LR = 1e-3
 DEFAULT_WEIGHT_DECAY = 1e-4
+PROTOCOL_VERSION = "b2_gru_v2"
 
 
 def configure_runtime():
@@ -274,6 +276,7 @@ def run_loso(
     device=None,
     max_folds=None,
     checkpoint_dir=None,
+    run_metadata=None,
     verbose=True,
 ):
     """Run B2 over cached time series and leakage-safe LOSO folds."""
@@ -296,6 +299,7 @@ def run_loso(
     )
     completed = 0
     checkpoint_config = {
+        "protocol_version": PROTOCOL_VERSION,
         "hidden": int(hidden),
         "layers": int(layers),
         "dropout": float(dropout),
@@ -305,6 +309,7 @@ def run_loso(
         "lr": float(lr),
         "weight_decay": float(weight_decay),
         "threshold": float(threshold),
+        "run_metadata": run_metadata,
     }
 
     for seed in seeds:
@@ -315,11 +320,16 @@ def run_loso(
             test_site_idx = int(fold["test_site_idx"])
             test_site = sites[test_site_idx]
             test_idx = np.asarray(fold["test_idx"], dtype=np.int64)
+            expected_checkpoint_config = {
+                **checkpoint_config,
+                "fold_signature": fold_signature(fold),
+                "test_site": test_site,
+            }
             checkpoint = None
             if checkpoint_dir is not None:
                 checkpoint = _load_checkpoint(
                     _checkpoint_path(checkpoint_dir, seed, fold["fold"]),
-                    checkpoint_config,
+                    expected_checkpoint_config,
                 )
 
             if checkpoint is not None:
@@ -380,7 +390,7 @@ def run_loso(
                     _save_checkpoint(
                         _checkpoint_path(checkpoint_dir, seed, fold["fold"]),
                         {
-                            "config": checkpoint_config,
+                            "config": expected_checkpoint_config,
                             "predictions": fold_predictions,
                             "selection": fold_selection,
                             "history": fold_history,
@@ -421,9 +431,11 @@ def _write_report(path, summary, site_summary, seed_summary, hidden, layers):
     metric_labels = {
         "accuracy": "ACC",
         "auc": "AUC",
+        "pr_auc": "PR-AUC",
         "sensitivity": "SEN",
         "specificity": "SPE",
         "balanced_accuracy": "Balanced ACC",
+        "f1": "F1",
         "kappa": "Cohen's kappa",
     }
     lines = [
@@ -455,29 +467,31 @@ def _write_report(path, summary, site_summary, seed_summary, hidden, layers):
         "",
         "## Per-seed",
         "",
-        "| seed | ACC | AUC | SEN | SPE | Balanced ACC | Kappa | worst-site AUC |",
-        "|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| seed | ACC | AUC | PR-AUC | SEN | SPE | Balanced ACC | F1 | Kappa | worst-site AUC |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in seed_summary.itertuples(index=False):
         lines.append(
             f"| {row.seed} | {row.macro_accuracy:.4f} | {row.macro_auc:.4f} | "
+            f"{row.macro_pr_auc:.4f} | "
             f"{row.macro_sensitivity:.4f} | {row.macro_specificity:.4f} | "
-            f"{row.macro_balanced_accuracy:.4f} | {row.macro_kappa:.4f} | "
-            f"{row.worst_site_auc:.4f} |"
+            f"{row.macro_balanced_accuracy:.4f} | {row.macro_f1:.4f} | "
+            f"{row.macro_kappa:.4f} | {row.worst_site_auc:.4f} |"
         )
 
     lines += [
         "",
         "## Per-site",
         "",
-        "| site | n | ACC | AUC | SEN | SPE | Balanced ACC | Kappa |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| site | n | ACC | AUC | PR-AUC | SEN | SPE | Balanced ACC | F1 | Kappa |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in site_summary.itertuples(index=False):
         lines.append(
             f"| {row.test_site} | {row.n_subjects} | {row.accuracy_mean:.4f} | "
-            f"{row.auc_mean:.4f} | {row.sensitivity_mean:.4f} | "
-            f"{row.specificity_mean:.4f} | {row.balanced_accuracy_mean:.4f} | "
+            f"{row.auc_mean:.4f} | {row.pr_auc_mean:.4f} | "
+            f"{row.sensitivity_mean:.4f} | {row.specificity_mean:.4f} | "
+            f"{row.balanced_accuracy_mean:.4f} | {row.f1_mean:.4f} | "
             f"{row.kappa_mean:.4f} |"
         )
     lines += [
@@ -517,6 +531,7 @@ def run_from_cache(
     if cached_sites != sites:
         raise ValueError("cache and fold files disagree on site ordering")
 
+    run_metadata = run_fingerprint(cache_path, folds_path)
     predictions, selections, histories = run_loso(
         x=data["X"],
         labels=data["label"],
@@ -536,6 +551,7 @@ def run_from_cache(
         device=device,
         max_folds=max_folds,
         checkpoint_dir=output_dir / "checkpoints",
+        run_metadata=run_metadata,
     )
     site_metrics, seed_summary, site_summary, summary = summarize(
         predictions, selections
@@ -543,6 +559,7 @@ def run_from_cache(
     summary.update(
         {
             "model": "B2_bidirectional_gru",
+            "protocol_version": PROTOCOL_VERSION,
             "cache": str(cache_path),
             "folds": str(folds_path),
             "seeds": [int(s) for s in seeds],
@@ -556,6 +573,8 @@ def run_from_cache(
             "weight_decay": float(weight_decay),
             "device": str(device or ("cuda" if torch.cuda.is_available() else "cpu")),
             "max_folds": None if max_folds is None else int(max_folds),
+            "binary_threshold": 0.5,
+            "provenance": run_metadata,
         }
     )
 
@@ -592,7 +611,7 @@ def main():
     ap = argparse.ArgumentParser(description="Stage-2 B2 pure temporal GRU baseline")
     ap.add_argument("--cache", default=str(config.CACHE_DIR / f"{tag}.npz"))
     ap.add_argument("--folds", default=str(config.CACHE_DIR / f"{tag}_folds.json"))
-    ap.add_argument("--out", default=str(config.PROJECT_ROOT / "outputs" / "stage2_b2"))
+    ap.add_argument("--out", default=str(config.PROJECT_ROOT / "outputs" / "stage2_b2_v2"))
     ap.add_argument("--seeds", nargs="+", type=int, default=list(config.SEEDS))
     ap.add_argument("--hidden", type=int, default=DEFAULT_HIDDEN)
     ap.add_argument("--layers", type=int, default=DEFAULT_LAYERS)

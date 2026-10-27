@@ -21,7 +21,9 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
 from . import config
-from .metrics import binary_metrics, mean_std
+from .metrics import binary_metrics
+from .provenance import run_fingerprint
+from .stage2_summary import summarize_predictions
 
 
 DEFAULT_C_GRID = (0.001, 0.01, 0.1, 1.0, 10.0)
@@ -125,6 +127,7 @@ def run_loso(
 
     for seed in seeds:
         for fold in folds[str(seed)]:
+            fold_started = time.time()
             test_site_idx = int(fold["test_site_idx"])
             test_site = sites[test_site_idx]
             test_idx = np.asarray(fold["test_idx"], dtype=np.int64)
@@ -145,6 +148,7 @@ def run_loso(
                     "fold": int(fold["fold"]),
                     "test_site": test_site,
                     **details,
+                    "wall_seconds": float(time.time() - fold_started),
                 }
             )
             for idx, score in zip(test_idx, scores):
@@ -178,85 +182,27 @@ def run_loso(
 
 def summarize(predictions, selections, threshold=0.5):
     """Build seed-level, site-level and overall summaries."""
-    metric_rows = []
-    for (seed, site), group in predictions.groupby(["seed", "test_site"], sort=True):
-        metric_rows.append(
-            {
-                "seed": int(seed),
-                "test_site": site,
-                **binary_metrics(
-                    group["label"].to_numpy(),
-                    group["score"].to_numpy(),
-                    threshold=threshold,
-                ),
-            }
-        )
-    site_metrics = pd.DataFrame(metric_rows)
-
-    seed_rows = []
-    for seed, group in site_metrics.groupby("seed", sort=True):
-        seed_rows.append(
-            {
-                "seed": int(seed),
-                "n_sites": int(len(group)),
-                "macro_auc": float(group["auc"].mean()),
-                "macro_balanced_accuracy": float(group["balanced_accuracy"].mean()),
-                "macro_sensitivity": float(group["sensitivity"].mean()),
-                "macro_specificity": float(group["specificity"].mean()),
-                "worst_site_auc": float(group["auc"].min()),
-                "std_site_auc": float(group["auc"].std(ddof=1)),
-            }
-        )
-    seed_summary = pd.DataFrame(seed_rows)
-
-    site_rows = []
-    for site, group in site_metrics.groupby("test_site", sort=True):
-        auc_mean, auc_std = mean_std(group["auc"])
-        bacc_mean, bacc_std = mean_std(group["balanced_accuracy"])
-        site_rows.append(
-            {
-                "test_site": site,
-                "n_subjects": int(group["n"].iloc[0]),
-                "n_seeds": int(len(group)),
-                "auc_mean": auc_mean,
-                "auc_std": auc_std,
-                "balanced_accuracy_mean": bacc_mean,
-                "balanced_accuracy_std": bacc_std,
-                "worst_seed_auc": float(group["auc"].min()),
-            }
-        )
-    site_summary = pd.DataFrame(site_rows)
-
-    def seed_stat(column):
-        return mean_std(seed_summary[column])
-
-    macro_auc_mean, macro_auc_std = seed_stat("macro_auc")
-    macro_bacc_mean, macro_bacc_std = seed_stat("macro_balanced_accuracy")
-    worst_mean, worst_std = seed_stat("worst_site_auc")
-    site_std_mean, site_std_std = seed_stat("std_site_auc")
+    site_metrics, seed_summary, site_summary, summary = summarize_predictions(
+        predictions, selections, threshold=threshold
+    )
     selected_counts = selections["selected_c"].value_counts().sort_index()
-
-    summary = {
-        "n_predictions": int(len(predictions)),
-        "n_folds": int(len(selections)),
-        "n_seeds": int(predictions["seed"].nunique()),
-        "n_sites": int(predictions["test_site"].nunique()),
-        "macro_auc_mean": macro_auc_mean,
-        "macro_auc_std": macro_auc_std,
-        "macro_balanced_accuracy_mean": macro_bacc_mean,
-        "macro_balanced_accuracy_std": macro_bacc_std,
-        "worst_site_auc_mean": worst_mean,
-        "worst_site_auc_std": worst_std,
-        "mean_within_seed_site_auc_std": site_std_mean,
-        "mean_within_seed_site_auc_std_across_seeds": site_std_std,
-        "selected_c_counts": {
-            f"{float(c):g}": int(n) for c, n in selected_counts.items()
-        },
+    summary["selected_c_counts"] = {
+        f"{float(c):g}": int(n) for c, n in selected_counts.items()
     }
     return site_metrics, seed_summary, site_summary, summary
 
 
 def _write_report(path, summary, site_summary, seed_summary):
+    metric_labels = {
+        "accuracy": "ACC",
+        "auc": "AUC",
+        "pr_auc": "PR-AUC",
+        "sensitivity": "SEN",
+        "specificity": "SPE",
+        "balanced_accuracy": "Balanced ACC",
+        "f1": "F1",
+        "kappa": "Cohen's kappa",
+    }
     lines = [
         "# Stage 2 B0 report",
         "",
@@ -268,11 +214,13 @@ def _write_report(path, summary, site_summary, seed_summary):
         "",
         "## Overall",
         "",
-        f"- site-macro AUC: **{summary['macro_auc_mean']:.4f} "
-        f"± {summary['macro_auc_std']:.4f}** (mean ± SD across seeds)",
-        f"- site-macro balanced accuracy: "
-        f"{summary['macro_balanced_accuracy_mean']:.4f} "
-        f"± {summary['macro_balanced_accuracy_std']:.4f}",
+    ]
+    for name, label in metric_labels.items():
+        lines.append(
+            f"- site-macro {label}: **{summary[f'macro_{name}_mean']:.4f} "
+            f"± {summary[f'macro_{name}_std']:.4f}**"
+        )
+    lines += [
         f"- mean worst-site AUC: {summary['worst_site_auc_mean']:.4f} "
         f"± {summary['worst_site_auc_std']:.4f}",
         f"- folds: {summary['n_folds']} ({summary['n_seeds']} seeds x "
@@ -280,28 +228,32 @@ def _write_report(path, summary, site_summary, seed_summary):
         "",
         "## Per-seed",
         "",
-        "| seed | macro AUC | macro balanced acc. | worst-site AUC | site SD |",
-        "|---:|---:|---:|---:|---:|",
+        "| seed | ACC | AUC | PR-AUC | SEN | SPE | Balanced ACC | F1 | Kappa |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in seed_summary.itertuples(index=False):
         lines.append(
-            f"| {row.seed} | {row.macro_auc:.4f} | "
-            f"{row.macro_balanced_accuracy:.4f} | {row.worst_site_auc:.4f} | "
-            f"{row.std_site_auc:.4f} |"
+            f"| {row.seed} | {row.macro_accuracy:.4f} | "
+            f"{row.macro_auc:.4f} | {row.macro_pr_auc:.4f} | "
+            f"{row.macro_sensitivity:.4f} | {row.macro_specificity:.4f} | "
+            f"{row.macro_balanced_accuracy:.4f} | {row.macro_f1:.4f} | "
+            f"{row.macro_kappa:.4f} |"
         )
 
     lines += [
         "",
         "## Per-site",
         "",
-        "| site | n | AUC mean | AUC SD | balanced acc. | worst seed AUC |",
-        "|---|---:|---:|---:|---:|---:|",
+        "| site | n | ACC | AUC | PR-AUC | SEN | SPE | Balanced ACC | F1 | Kappa |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in site_summary.itertuples(index=False):
         lines.append(
-            f"| {row.test_site} | {row.n_subjects} | {row.auc_mean:.4f} | "
-            f"{row.auc_std:.4f} | {row.balanced_accuracy_mean:.4f} | "
-            f"{row.worst_seed_auc:.4f} |"
+            f"| {row.test_site} | {row.n_subjects} | {row.accuracy_mean:.4f} | "
+            f"{row.auc_mean:.4f} | {row.pr_auc_mean:.4f} | "
+            f"{row.sensitivity_mean:.4f} | {row.specificity_mean:.4f} | "
+            f"{row.balanced_accuracy_mean:.4f} | {row.f1_mean:.4f} | "
+            f"{row.kappa_mean:.4f} |"
         )
     lines += [
         "",
@@ -324,6 +276,7 @@ def run_from_cache(cache_path, folds_path, output_dir, seeds, c_grid, fixed_c, m
     if cached_sites != sites:
         raise ValueError("cache and fold files disagree on site ordering")
 
+    provenance = run_fingerprint(cache_path, folds_path)
     features = fc_upper_features(data["FC"])
     predictions, selections = run_loso(
         features=features,
@@ -346,6 +299,8 @@ def run_from_cache(cache_path, folds_path, output_dir, seeds, c_grid, fixed_c, m
             "seeds": [int(s) for s in seeds],
             "c_grid": [float(c) for c in (c_grid if fixed_c is None else (fixed_c,))],
             "max_iter": int(max_iter),
+            "binary_threshold": 0.5,
+            "provenance": provenance,
         }
     )
 
@@ -373,7 +328,7 @@ def main():
     ap = argparse.ArgumentParser(description="Stage-2 B0 FC logistic-regression baseline")
     ap.add_argument("--cache", default=str(config.CACHE_DIR / f"{tag}.npz"))
     ap.add_argument("--folds", default=str(config.CACHE_DIR / f"{tag}_folds.json"))
-    ap.add_argument("--out", default=str(config.PROJECT_ROOT / "outputs" / "stage2_b0"))
+    ap.add_argument("--out", default=str(config.PROJECT_ROOT / "outputs" / "stage2_b0_v2"))
     ap.add_argument("--seeds", nargs="+", type=int, default=list(config.SEEDS))
     ap.add_argument("--c-grid", nargs="+", type=float, default=list(DEFAULT_C_GRID))
     ap.add_argument("--fixed-c", type=float, default=None)

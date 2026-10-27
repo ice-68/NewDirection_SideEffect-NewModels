@@ -27,7 +27,10 @@ def test_binary_metrics():
     assert np.isclose(out["balanced_accuracy"], 0.5)
     assert np.isclose(out["sensitivity"], 0.5)
     assert np.isclose(out["specificity"], 0.5)
+    assert np.isclose(out["pr_auc"], 5.0 / 6.0)
+    assert np.isclose(out["f1"], 0.5)
     assert np.isclose(out["kappa"], 0.0)
+    assert (out["tn"], out["fp"], out["fn"], out["tp"]) == (1, 1, 1, 1)
 
 
 def test_b0_loso_smoke_and_summary():
@@ -68,6 +71,8 @@ def test_b0_loso_smoke_and_summary():
     assert len(seed_summary) == 2
     assert len(site_summary) == 3
     assert np.isfinite(summary["macro_auc_mean"])
+    assert np.isfinite(summary["macro_pr_auc_mean"])
+    assert np.isfinite(summary["macro_f1_mean"])
 
 
 def main():
