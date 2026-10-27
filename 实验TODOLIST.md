@@ -65,7 +65,7 @@
 - [x] 1.3 时序张量构造（`src/windows.py`：整段序列默认；滑窗 / 窗均值可选）。
 - [x] 1.4 **LOSO 折划分** + 内层验证集（`src/splits.py`，每 seed 20 折 × 5 seeds，index 已存 `cache/*_folds.json`）。
 - [x] 1.5 训练折内拟合标准化（`src/preprocess.fit_zscore` / `apply_zscore`；缓存刻意不写入标准化）。
-- [x] 验收：`python tests/test_pipeline.py` → **11/11 通过**（含 R1 测试站不进入 train/val、R2 改测试折不改变训练统计量）。
+- [x] 验收：`python tests/test_pipeline.py` → **14/14 通过**（含 R1 测试站不进入 train/val、R2 改测试折不改变训练统计量）。
 
 ### 阶段 2 — 五组核心对照（Baselines）
 | 编号 | 模型 | 主要回答的问题 |
@@ -76,8 +76,8 @@
 | B3 | Mamba 时序模型 | Mamba 是否优于常规时序模型？ |
 | B4 | Mamba + GAT | 两类信息结合后是否产生额外收益？ |
 
-- [ ] 2.1 实现 B0（SVM/逻辑回归 + FC 上三角特征）。
-- [ ] 2.2 实现 B1（GAT）。
+- [x] 2.1 实现 B0（逻辑回归 + FC 上三角特征）。正式 5-seed LOSO 已完成（100 折），site-macro AUC = **0.7044 ± 0.0008**，产物见 `outputs/stage2_b0/`。
+- [x] 2.2 实现 B1（GCA / AN-GCN，仿 Salim & Hamza 的受试者人口图）。正式 5-seed LOSO 已完成（100 折），site-macro AUC = **0.6362 ± 0.0163**、ACC = **0.5912**、Kappa = **0.1865**，产物见 `outputs/stage2_b1/`。站点不参与边权重；测试站节点留在图内但不贡献标签或特征选择（转导式）。
 - [ ] 2.3 实现 B2（GRU/TCN）。
 - [ ] 2.4 实现 B3（Mamba）。
 - [ ] 2.5 实现 B4（Mamba + GAT）。
@@ -87,6 +87,7 @@
 ### 阶段 3 — LOSO 评估与指标
 - [ ] 3.1 主指标：**站点宏平均 AUC**（已确认各站含两类，满足前提）。
 - [ ] 3.2 辅助指标：站点宏平均平衡准确率、最差站点表现、各站表现标准差、敏感度 / 特异度。
+- [ ] 3.2a 统一评估指标集：每组实验必须同时报告 **Accuracy、AUC、Sensitivity、Specificity、Cohen's kappa**，并保留 Balanced Accuracy、F1 等辅助指标；所有指标按站点、模型和随机种子完整保存。
 - [ ] 3.3 多种子（≥5）重复训练，保存每站点 / 每模型 / 每种子预测结果。
 - [ ] 3.4 站点级差异分析 + 不确定性估计（bootstrap 置信区间等）。
 - 验收：一张「站点 × 模型」性能矩阵 + 不确定性报告。
