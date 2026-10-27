@@ -27,6 +27,7 @@ from .stage2_summary import summarize_predictions
 
 
 DEFAULT_C_GRID = (0.001, 0.01, 0.1, 1.0, 10.0)
+PROTOCOL_VERSION = "b0_logistic_fc_v2"
 
 
 def fc_upper_features(fc):
@@ -294,6 +295,7 @@ def run_from_cache(cache_path, folds_path, output_dir, seeds, c_grid, fixed_c, m
     summary.update(
         {
             "model": "B0_logistic_regression_fc_upper",
+            "protocol_version": PROTOCOL_VERSION,
             "cache": str(cache_path),
             "folds": str(folds_path),
             "seeds": [int(s) for s in seeds],
