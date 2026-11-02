@@ -1,5 +1,18 @@
 # Project Changelog
 
+## 2026-11-02
+
+- Created branch `codex/project-cleanup`.
+- Removed the unused local `.venv`, IDE metadata, pytest cache, and source
+  bytecode caches.
+- Removed 19 obsolete smoke, seed0, and pre-v2 experiment directories.
+- Kept the three formal B0-B2 result directories and all raw data/cache files.
+- Rewrote `README.md` as the project entry point and synchronized the
+  experiment TODO with the completed B1/B2 results.
+- Reran B0 under the current output contract.
+- Verified all three formal B0-B2 outputs with `src.verify_stage2` and ran the
+  complete test suite (16 passed).
+
 ## 2026-10-27
 
 - Created branch `codex/stage2-pre-b3`.

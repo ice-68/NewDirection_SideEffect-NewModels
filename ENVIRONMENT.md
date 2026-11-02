@@ -19,9 +19,9 @@ Verified versions:
 - NumPy 2.3.5
 - pandas 3.0.1
 
-The repository-local `.venv` does not contain PyTorch and must not be used for
-Stage 2 runs. Experiment summaries also record the interpreter and package
-versions through `src/provenance.py`.
+The project does not keep a repository-local `.venv`; all runs use the
+canonical interpreter above. Experiment summaries also record the interpreter
+and package versions through `src/provenance.py`.
 
 ## Run Commands
 
