@@ -1,5 +1,13 @@
 # Project Changelog
 
+## 2026-11-04
+
+- Created branch `codex/stage3-b3`.
+- Installed and pinned `mambapy==1.2.0` as the pure-PyTorch Mamba backend.
+- Added the B3 unidirectional temporal Mamba runner with training-only
+  standardisation, LOSO checkpoints, provenance, and shared Stage 2 metrics.
+- Added B3 forward, checkpoint, and LOSO smoke tests.
+
 ## 2026-11-02
 
 - Created branch `codex/project-cleanup`.
