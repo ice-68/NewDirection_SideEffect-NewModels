@@ -87,11 +87,16 @@ def main():
     parser.add_argument(
         "--b2", default=str(config.PROJECT_ROOT / "outputs" / "stage2_b2_v2")
     )
+    parser.add_argument(
+        "--b3", default=str(config.PROJECT_ROOT / "outputs" / "stage2_b3_v1")
+    )
     args = parser.parse_args()
 
     verify_output("B0", args.b0, "b0_logistic_fc_v2", False)
     verify_output("B1", args.b1, "b1_inductive_star_v1", True)
     verify_output("B2", args.b2, "b2_gru_v2", True)
+    if Path(args.b3).exists():
+        verify_output("B3", args.b3, "b3_mamba_v1", True)
 
 
 if __name__ == "__main__":

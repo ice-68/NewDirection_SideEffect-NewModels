@@ -8,14 +8,15 @@ ASD 相关信号与站点捷径。
 
 - 工作集：877 名受试者、20 个站点、CC200、T=78。
 - 定义闸：已冻结，见 `METRICS.md`。
-- 已完成：B0、B1（strict inductive）、B2 的 5-seed LOSO。
-- 下一步：B3（Mamba）；尚未开始。
+- 已完成：B0、B1（strict inductive）、B2、B3 的 5-seed LOSO。
+- 下一步：B4（Mamba + 图模型）。
 
 | 模型 | site-macro AUC | Balanced ACC | 正式结果 |
 |---|---:|---:|---|
 | B0 FC + logistic regression | 0.7044 ± 0.0008 | 0.6469 | `outputs/stage2_b0_v2/` |
 | B1 strict inductive GCA | 0.6362 ± 0.0142 | 0.5978 | `outputs/stage2_b1_inductive/` |
 | B2 bidirectional GRU | 0.5775 ± 0.0221 | 0.5460 | `outputs/stage2_b2_v2/` |
+| B3 unidirectional Mamba | 0.6148 ± 0.0282 | 0.5695 | `outputs/stage2_b3_v1/` |
 
 上述数值仅为描述性结果，模型优劣和科学解释需人工复核。
 
@@ -26,7 +27,7 @@ src/            可复现分析代码
 tests/          回归测试
 cache/          可重建缓存与 LOSO 划分
 data/           原始数据，只读
-outputs/        当前三套正式实验结果
+outputs/        当前四套正式实验结果
 logs/           变更记录
 Papers/         文献材料
 METRICS.md      Stage 2 评估契约
@@ -51,6 +52,7 @@ C:\Users\28439\miniconda3\python.exe
 & 'C:\Users\28439\miniconda3\python.exe' -m src.b0
 & 'C:\Users\28439\miniconda3\python.exe' -m src.b1
 & 'C:\Users\28439\miniconda3\python.exe' -m src.b2
+& 'C:\Users\28439\miniconda3\python.exe' -m src.b3
 & 'C:\Users\28439\miniconda3\python.exe' -m src.verify_stage2
 ```
 

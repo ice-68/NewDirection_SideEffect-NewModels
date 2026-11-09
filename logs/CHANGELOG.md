@@ -1,5 +1,13 @@
 # Project Changelog
 
+## 2026-11-09
+
+- Resumed B3 from 83/100 fold checkpoints without retraining completed folds.
+- Finished the formal B3 5-seed LOSO run.
+- B3 site-macro AUC: 0.6148 +/- 0.0282; balanced accuracy: 0.5695.
+- Verified B0-B3 together with `src.verify_stage2`.
+- Full test suite passed: 19 tests.
+
 ## 2026-11-04
 
 - Created branch `codex/stage3-b3`.
