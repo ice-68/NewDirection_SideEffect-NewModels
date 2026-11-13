@@ -1,0 +1,32 @@
+{
+  "bootstrap": {
+    "ci_level": 0.95,
+    "n_replicates": 10000,
+    "resampling_unit": "held_out_site",
+    "seed": 20261113,
+    "seed_preservation": "all_seeds_for_sampled_site"
+  },
+  "environment": {
+    "cuda_available": true,
+    "cuda_version": "12.8",
+    "numpy": "2.3.5",
+    "pandas": "3.0.1",
+    "python": "3.13.12",
+    "scikit_learn": "1.8.0",
+    "torch": "2.12.0.dev20260315+cu128"
+  },
+  "git_commit": "009516a7a81ecd858804538daee607afe369ef39",
+  "input_sha256": {
+    "B0": "78637f7db51d363b7ed095dd60176766498546068e92ec321892fd8574884a10",
+    "B1": "2ec592997c41ac6d0847d59e8c3982db52ba892c9c95327665ea0e181be9d365",
+    "B2": "d30df52015cd3ba4c63eb6a4b4d0d8bbd3e87b75f8727668dca4a3fafc72aa33",
+    "B3": "a8c6702ff8b62b5885a3063845fbfef8a7b50359ae0d7bbff97541230785a3c0"
+  },
+  "models": [
+    "B0",
+    "B1",
+    "B2",
+    "B3"
+  ],
+  "protocol_version": "stage3_uncertainty_v1"
+}

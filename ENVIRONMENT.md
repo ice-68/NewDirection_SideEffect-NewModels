@@ -31,6 +31,7 @@ and package versions through `src/provenance.py`.
 & 'C:\Users\28439\miniconda3\python.exe' -m src.b1
 & 'C:\Users\28439\miniconda3\python.exe' -m src.b2
 & 'C:\Users\28439\miniconda3\python.exe' -m src.b3
+& 'C:\Users\28439\miniconda3\python.exe' -m src.stage3_eval
 ```
 
 Long B1 and B2 runs write one atomic checkpoint per LOSO fold. A rerun with the

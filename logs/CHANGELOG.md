@@ -1,5 +1,17 @@
 # Project Changelog
 
+## 2026-11-13
+
+- Created branch `codex/stage3-evaluation`.
+- Froze the `stage3_uncertainty_v1` site-cluster bootstrap protocol before
+  computing uncertainty intervals.
+- Added `src/stage3_eval.py` and five focused tests for deterministic site
+  cluster bootstrap and site-by-model summaries.
+- Generated 10,000-replicate 95% CIs for B0-B3 and a 20-site by 4-model AUC
+  matrix under `results/stage3_evaluation/`.
+- Verified deterministic output hashes across two runs, the full test suite
+  (24 passed), and all four frozen Stage 2 output contracts.
+
 ## 2026-11-09
 
 - Resumed B3 from 83/100 fold checkpoints without retraining completed folds.
