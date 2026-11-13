@@ -62,6 +62,38 @@ mean +/- SD across seeds.
 - Any change to this contract requires a new dated section, a new experiment
   version, and a full rerun of the affected models.
 
+## Stage 3 Uncertainty Addendum
+
+Defined: 2026-11-13
+
+This addendum applies only to post-processing of the frozen Stage 2 outputs.
+The primary metric definition and the formal model results are unchanged.
+
+- Uncertainty target: the equal-site-weighted mean of seed-level site-macro
+  AUC across seeds 0-4.
+- Resampling unit: held-out site. Each of the 20 sites is sampled with
+  replacement to form one bootstrap data set.
+- Seed preservation: when a site is selected, all five seed-specific AUC values
+  for that site are selected together. This preserves the repeated-measures
+  structure across seeds.
+- Replicate statistic: arithmetic mean of all selected site-by-seed AUC values.
+  Equivalently, compute the site-macro AUC for each seed and average over the
+  five seeds.
+- Number of replicates: 10,000.
+- Bootstrap seed: 20261113.
+- Interval: percentile interval using the empirical 2.5th and 97.5th
+  percentiles of the replicate statistics.
+- Complete site-by-seed matrices are required. Duplicate cells, missing cells,
+  or non-finite AUC values invalidate the analysis.
+
+The interval captures between-site heterogeneity and repeated-seed variation.
+It does not re-estimate models, resample subjects within sites, or represent
+uncertainty for a new subject from an already sampled site.
+
+The companion site-by-model matrix reports the mean and sample standard
+deviation of AUC across seeds for every site and model. These summaries are
+descriptive and do not replace the frozen primary metric.
+
 ## Required Outputs
 
 Each experiment directory must contain:
